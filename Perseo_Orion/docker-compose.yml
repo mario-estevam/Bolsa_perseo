@@ -1,0 +1,69 @@
+version: '3.4'
+services:
+    
+    perseo-mongo:
+        image: mongo:3.2
+        volumes:
+            - ./mongodata:/data/db
+        networks:
+            - perseo
+        hostname: perseo-mongo
+        deploy:
+            replicas: 1
+            restart_policy:
+                condition: on-failure
+    
+    perseo-core:
+        image: fiware/perseo-core
+        environment:
+            - PERSEO_FE_URL=http://perseo-fe:9090
+            - MAX_AGE=6000
+        networks:
+            - perseo
+        ports:
+            - 8080:8080
+        depends_on:
+            - perseo-mongo
+        deploy:
+            replicas: 1
+            restart_policy:
+                condition: on-failure
+    
+    perseo-fe:
+        image: fiware/perseo
+        networks:
+            perseo:
+            main:
+        ports:
+            - 9090:9090
+        depends_on:
+            - perseo-core
+        environment:
+            - PERSEO_MONGO_ENDPOINT=perseo-mongo
+            - PERSEO_CORE_URL=http://perseo-core:8080
+            - PERSEO_LOG_LEVEL=debug
+            - PERSEO_ORION_URL=http://orion:1026/
+        deploy:
+            replicas: 1
+            restart_policy:
+                condition: on-failure
+    
+    orion:
+        container_name: orion
+        restart: always
+        image: fiware/orion:latest
+        ports:
+            - 1026:1026
+        depends_on:
+            - perseo-mongo
+        networks:
+            - perseo
+        hostname: orion
+        command: -dbhost perseo-mongo -logLevel DEBUG
+        logging:
+            options:
+                max-size: "100m"
+                max-file: "5"
+networks:
+    perseo:
+    main:
